@@ -1,23 +1,36 @@
-const passport = require('passport');
-const GoogleStrategy = require('passport-google-oauth2').Strategy;
+const axios = require('axios');
+const jwt = require("jsonwebtoken");
+const jwtSecret = "a4bbc339-72f1-4095-80eb-f10e5709a5ef";
 
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '119082365930-s1h8lgre9nje5jgnddt19ffmhdhifjab.apps.googleusercontent.com';
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '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';
+async function login(req, res) {
+    const sessionUser = (await axios.post('http://localhost:4003/login', {
+        email: req?.body?.email,
+        password: req?.body?.password
+    })).data;
+    if (!!!sessionUser || sessionUser.password !== req.body.password) {
+        return res.status(401).send("E-mail or password does not match");
+    }
+    const token = generateToken(sessionUser);
+    console.log('User Authenticated');
+    return res.status(200).json(token);
+}
 
-passport.use(new GoogleStrategy({
-        clientID: GOOGLE_CLIENT_ID,
-        clientSecret: GOOGLE_CLIENT_SECRET,
-        callbackURL: "http://localhost:5000/auth/google/callback",
-        passReqToCallback: true,
-    },
-    function(request, accessToken, refreshToken, profile, done) {
-        return done(null, profile);
-    }));
+async function loginGoogle(req, res) {
+    const sessionUser = (await axios.post('http://localhost:4003/login-google', req.body)).data;
+    const token = generateToken(sessionUser);
+    console.log('Google User Authenticated');
+    return res.status(200).send(token);
+}
 
-passport.serializeUser(function(user, done) {
-    done(null, user);
-});
+function generateToken(sessionUser) {
+    const maxAge = 3 * 60 * 60;
+    return jwt.sign(
+        {id: sessionUser._id, name: sessionUser.name, email: sessionUser.email},
+        jwtSecret,
+        {
+            expiresIn: maxAge,
+        }
+    );
+}
 
-passport.deserializeUser(function(user, done) {
-    done(null, user);
-});
+module.exports = { login, loginGoogle };
